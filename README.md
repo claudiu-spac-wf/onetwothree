@@ -114,6 +114,20 @@ The format itself is easy to work with, but there is 1 caveat - the DatabaseGuid
 
 **By default each index will be going through data for 20 seconds. If you want to run for more than that, you'll need to add a "MaxRunTime": number_seconds to the ttConfig object. **
 
+### Limiting the scope of queries
+While its nice to get data on the entire contents of a table, sometimes it makes more sense to limit it to just a subset of data. Perhaps you don't want info on all orders, but just those that got created in the last year.
+
+To support this we have a QueryString field that can be added to the ttConfig object. This will contain a query that will be used throughout the generated code to limit the scope of what we're reading. Using the order example above, you might do something like this:
+```json
+{
+  ...,
+  "QueryString": "&1.OrderDate > today - 365",
+  ...
+}
+```
+
+When referencing to the buffer, you should always use &1 as that will be substituted away to the buffer name that makes sense in the context. If you don't, chances are things won't compile, the results won't make sense, or things will crash at runtime.
+
 ### Generating the reports
 Now that you have a config file, you'll need to generate the code that actually runs all of those aggregate statements. This can be simply done using
 ```
