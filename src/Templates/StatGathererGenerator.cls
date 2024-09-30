@@ -30,8 +30,6 @@ class Templates.StatGathererGenerator:
     assign
       OutputText = "using Progress.Lang.*.~nblock-level on error undo, throw.~n~nclass " + ClassName + " inherits BaseStatGatherer:~n"
       OutputText = OutputText + "define protected variable IndexGuid as character no-undo initial '" + IndexGuid + "'.~n~n".
-      
-      
     
     return OutputText.
   end method.
@@ -60,7 +58,7 @@ class Templates.StatGathererGenerator:
     return OutputText.
   end method.
 
-  method public longchar GenerateLoopMethodContent(input Depth as integer, input TableName as character, input FieldNames as character, input DataType as character, input CallNextLoop as logical):
+  method public longchar GenerateLoopMethodContent(input Depth as integer, input TableName as character, input FieldNames as character, input DataType as character, input QueryString as character, input CallNextLoop as logical):
     define variable OutputText         as longchar  no-undo.
     define variable CurrentBufferName  as character no-undo.
     define variable ix                 as integer   no-undo.
@@ -83,21 +81,34 @@ class Templates.StatGathererGenerator:
     if Depth = 1 then
     do:
       assign
-        OutputText = OutputText + "for each " + CurrentBufferName + " no-lock ~nby " + CurrentBufferField + " descending:~nleave.~nend.~n~n"
-      
-        OutputText = OutputText + "do while available " + CurrentBufferName + ":~n"
-        OutputText = OutputText + "SplitByValue = " + CurrentBufferField + ".~n"
-      
-        OutputText = OutputText + "do on error undo, throw:~n"
-        OutputText = OutputText + "aggregate AggregateValue = count(" + AggregateField + ") for " + AggregateBuffer + " where ~n"
-        OutputText = OutputText + AggregateField + " = SplitByValue.~n~n".
+        OutputText = OutputText + "for each " + CurrentBufferName + " no-lock ~n".
+
+        if QueryString > "" then
+          OutputText = OutputText + "where " + substitute(QueryString, CurrentBufferName) + "~n".
+
+        assign
+          OutputText = OutputText + "by " + CurrentBufferField + " descending:~nleave.~nend.~n~n"
+        
+          OutputText = OutputText + "do while available " + CurrentBufferName + ":~n"
+          OutputText = OutputText + "SplitByValue = " + CurrentBufferField + ".~n"
+        
+          OutputText = OutputText + "do on error undo, throw:~n"
+          OutputText = OutputText + "aggregate AggregateValue = count(" + AggregateField + ") for " + AggregateBuffer + " where ~n".
+
+          if QueryString > "" then
+            OutputText = OutputText + substitute(QueryString, AggregateBuffer) + " and ~n".
+        
+          OutputText = OutputText + AggregateField + " = SplitByValue.~n~n".
         
     end.
     else
     do:
       assign
         OutputText = OutputText + "for each " + CurrentBufferName + " no-lock where ~n".
-        
+      
+      if QueryString > "" then
+        OutputText = OutputText + substitute(QueryString, CurrentBufferName) + " and~n".
+
       do ix = 1 to num-entries(FieldNames) - 1:
         OutputText = OutputText + CurrentBufferName + "." + entry(ix, FieldNames) + " = " + PreviousBufferName + "." + entry(ix, FieldNames) + 
           (if ix = num-entries(FieldNames) - 1 then "" else " and") + "~n".
@@ -113,6 +124,9 @@ class Templates.StatGathererGenerator:
         
         OutputText = OutputText + "aggregate AggregateValue = count(" + AggregateField + ") for " + AggregateBuffer + " where ~n".
       
+      if QueryString > "" then
+        OutputText = OutputText + substitute(QueryString, AggregateBuffer) + " and ~n".
+
       do ix = 1 to num-entries(FieldNames) - 1:
         OutputText = OutputText + AggregateBuffer + "." + entry(ix, FieldNames) + " = " + PreviousBufferName + "." + entry(ix, FieldNames) + " and" + "~n".
       end.
@@ -133,10 +147,13 @@ class Templates.StatGathererGenerator:
     
     OutputText = OutputText + "~nfor each " + CurrentBufferName + " no-lock where ~n".
     
+    if QueryString > "" then
+        OutputText = OutputText + substitute(QueryString, CurrentBufferName) + " and ~n".
+
     if Depth > 1 then
-    do ix = 1 to num-entries(FieldNames) - 1:
-      OutputText = OutputText + CurrentBufferName + "." + entry(ix, FieldNames) + " = " + PreviousBufferName + "." + entry(ix, FieldNames) + " and" + "~n".
-    end.
+      do ix = 1 to num-entries(FieldNames) - 1:
+        OutputText = OutputText + CurrentBufferName + "." + entry(ix, FieldNames) + " = " + PreviousBufferName + "." + entry(ix, FieldNames) + " and" + "~n".
+      end.
     
     assign
       OutputText = OutputText + CurrentBufferField + " < SplitByValue~n"

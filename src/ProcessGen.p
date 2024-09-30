@@ -76,7 +76,7 @@ procedure CreateStatGathererFiles:
       assign
         FieldNames = trim(FieldNames + "," + ttConfigField.IndexField, ",")
         TempLc     = TempLc + Generator:GenerateLoopMethodSignature(ttConfigField.Order, ttConfig.TableName)
-        TempLc     = TempLc + Generator:GenerateLoopMethodContent(ttConfigField.Order, ttConfig.TableName, FieldNames, ttConfigField.DataType, not last(ttConfigField.Order))
+        TempLc     = TempLc + Generator:GenerateLoopMethodContent(ttConfigField.Order, ttConfig.TableName, FieldNames, ttConfigField.DataType, ttConfig.QueryString, not last(ttConfigField.Order))
         TempLc     = TempLc + StatGathererGenerator:MethodEnd.
     end.
     

@@ -53,6 +53,7 @@ procedure InitLogging:
   
   message "Setting log level to" LoggingLevel.
   message "Logging will be output to" if LogFilename > "" then LogFilename else "stdout".
+
   assign
     BasicLogger:Instance:MinLogLevel = LoggingLevel
     BasicLogger:Instance:LogFilename = LogFilename.
