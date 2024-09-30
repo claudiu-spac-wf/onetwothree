@@ -1,0 +1,274 @@
+<html>
+
+<head>
+  <style>
+    .wrapper {
+      display: grid;
+      grid-gap: 10px;
+      grid-template-rows: 30px 100px 770px;
+      background-color: #fff;
+    }
+
+    .data-selection {
+      display: grid;
+      grid-gap: 10px;
+      grid-template-columns: 200px 250px 250px;
+      background-color: #fff;
+    }
+
+    .index-data>p {
+      display: grid;
+      grid-gap: 10px;
+      grid-template-columns: 200px 250px 250px;
+      background-color: #fff;
+    }
+
+    .chart-container>canvas {
+      width: 100%
+    }
+
+    select {
+      width: 150px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="text/javascript">
+
+    var data = [];
+    var tables = [];
+    var indexes = [];
+    var fileData = {};
+
+    var selectedTable = 0;
+    var selectedIndex = 0;
+
+    var currentIndexData = {};
+    var dataForXFields = 1;
+
+    var currentChart = null;
+
+    function dataForXFieldsChanged(input) {
+      dataForXFields = input.valueAsNumber;
+      createChartData();
+    }
+
+    function onDataFileChange(fileInput) {
+      const file = fileInput.files[0];
+
+      if (file) {
+        var reader = new FileReader();
+        reader.readAsText(file, "UTF-8");
+        reader.onload = function (evt) {
+          selectedTable = 0
+          selectedIndex = 0
+          parseInputFile(JSON.parse(evt.target.result))
+        }
+        reader.onerror = function (evt) {
+          document.getElementById("fileContents").innerHTML = "error reading file";
+        }
+      }
+    }
+    function parseInputFile(inputFileData) {
+      fileData = inputFileData;
+      tables = Array.from(new Set(inputFileData.ttIndexData.map((x) => x.TableName))).sort();
+      indexes = [];
+      tables.forEach(tableName => {
+        var tableIndexes = Array.from(new Set(inputFileData.ttIndexData.filter(x => x.TableName === tableName).map(x => x.IndexName)));
+        indexes.push(tableIndexes)
+      });
+
+      console.log("Tables:", tables);
+      console.log("Indexes:", indexes);
+
+      var tableSelect = document.getElementById('table');
+      emptySelect(tableSelect);
+
+      tables.forEach(x => {
+        tableSelect.options.add(new Option(x, x));
+      });
+
+      selectedTable = 0;
+      tableSelect.selectedIndex = 0;
+
+      onTableChange(tableSelect);
+    }
+
+    function onTableChange(table) {
+      selectedTable = table.selectedIndex;
+      var currentTableIndexes = indexes[selectedTable];
+
+      var indexSelect = document.getElementById('index');
+      emptySelect(indexSelect);
+
+      console.log("In table change:", currentTableIndexes);
+      currentTableIndexes.forEach(x => {
+        indexSelect.options.add(new Option(x, x))
+      });
+
+      selectedIndex = 0;
+      indexSelect.selectedIndex = 0;
+      onIndexChange(indexSelect);
+    }
+
+    function onIndexChange(index) {
+      selectedIndex = index.selectedIndex;
+
+      var currentTableName = tables[selectedTable];
+      var currentIndexName = indexes[selectedTable][selectedIndex];
+
+      console.log("Index Change:", currentTableName, currentIndexName);
+
+      currentIndexData = fileData.ttIndexData.filter(x => x.TableName === currentTableName && x.IndexName === currentIndexName)[0];
+
+      if (currentIndexData) {
+        document.getElementById('currentIndexName').innerHTML = currentIndexName;
+        document.getElementById('currentIndexFields').innerHTML = currentIndexData.IndexFields;
+        document.getElementById('dataForXFields').max = currentIndexData.IndexFields.split(',').length;
+        document.getElementById('dataForXFields').valueAsNumber = currentIndexData.IndexFields.split(',').length;
+        dataForXFields = currentIndexData.IndexFields.split(',').length;
+
+        document.getElementById('currentIndexAvg').innerHTML = currentIndexData.AverageRecords;
+        document.getElementById('currentIndexMin').innerHTML = currentIndexData.MinRecords;
+        document.getElementById('currentIndexMax').innerHTML = currentIndexData.MaxRecords;
+
+        createChartData();
+
+      }
+
+      console.log("Current Index Data:", currentIndexData);
+    }
+
+    function createChartData() {
+      console.log("Current index data:", currentIndexData);
+      var dataSlice = currentIndexData.ttDataPoint.filter(x => x.Depth === dataForXFields);
+      var labels = [];
+      var dataPoints = [];
+      var tooltips = [];
+
+      dataSlice.sort((a, b) => {
+        if (a.AggregateCount < b.AggregateCount) {
+          return -1;
+        }
+        if (a.AggregateCount > b.AggregateCount) {
+          return 1;
+        }
+        return 0;
+      }).forEach((x, y) => {
+        labels.push(x.AggregateCount);
+        dataPoints.push(x.AggregateCountOccurences);
+        tooltips.push(`Values for ${currentIndexData.IndexFields.split(',')[dataForXFields - 1]}: ${x.SplitByValueList? x.SplitByValueList.split(String.fromCharCode(31), 10) : '?'}`)
+      })
+      
+      const ctx = document.getElementById('myChart');
+
+      if (currentChart)
+        currentChart.destroy();
+
+      currentChart = new Chart(ctx, {
+        type: 'bar',
+        label: "#Records Returned By Index",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '# of records',
+            data: dataPoints,
+            tooltips: tooltips,
+            borderWidth: 1,
+            backgroundColor: [
+              "#f38b4a",
+              "#56d798",
+              "#ff8397",
+              "#6970d5"
+            ],
+            hoverBackgroundColor: [
+              "#f38b4a",
+              "#56d798",
+              "#ff8397",
+              "#6970d5"
+            ]
+          }]
+        },
+        options: {
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  console.log("Tooltip for context", context);
+                  let tooltip = context.dataset.tooltips[context.dataIndex];
+                  return tooltip;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              type: 'logarithmic',
+              bounds: 'data'
+            }
+          }
+        }
+      });
+    }
+
+    function emptySelect(select) {
+      while (select && select.length > 0) {
+        select.remove(0);
+      };
+    }
+  </script>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="data-selection">
+      <input type="file" id="data_file" accept=".json" onchange="onDataFileChange(this)" />
+
+      <div>
+        <label for="table"><b>Table:</b></label>
+        <select id="table" name="table" onchange="onTableChange(this)">Table:</select>
+      </div>
+
+      <div>
+        <label for="index"><b>Index:</b></label>
+        <select id="index" name="index" onchange="onIndexChange(this)">Table</select>
+      </div>
+    </div>
+
+    <div class="index-data">
+      <p>
+        <span>
+          <b>Index Name: </b> <span id="currentIndexName"></span>
+        </span>
+
+        <span>
+          <b>Index Fields: </b> <span id="currentIndexFields"></span>
+        </span>
+
+        <span>
+          <b>Show Data for X fields: </b> <input type="number" id="dataForXFields" min="1" max="1"
+            onchange="dataForXFieldsChanged(this)" />
+        </span>
+      </p>
+
+      <p>
+        <span>
+          <b>Index Avg Records: </b> <span id="currentIndexAvg"></span>
+        </span>
+
+        <span>
+          <b>Index Min Records: </b> <span id="currentIndexMin"></span>
+        </span>
+
+        <span>
+          <b>Index Max Records: </b> <span id="currentIndexMax"></span>
+        </span>
+      </p>
+    </div>
+    <div class="chart-container">
+      <canvas id="myChart"></canvas>
+    </div>
+  </div>
+</body>
+
+</html>

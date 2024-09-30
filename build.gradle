@@ -1,0 +1,88 @@
+/* Using OEDF's main plugin
+ * Requires - build config file and propath file
+*/
+plugins {
+  	id "progress.openedge.abl" version "2.3.0"
+}
+
+/* We need the empty database to compile our code, and we copy
+the other databases so we have some easy test data readily
+available. */
+task createEmptyDb(type: CreateDB){
+	dbName = 'empty'
+  sourceDb = "${dlcHome}/empty"
+	outputDir = "${buildDir}/db/empty"
+}
+
+task createSportsDb(type: CreateDB){
+	dbName = 'sports'
+  sourceDb = "${dlcHome}/sports"
+	outputDir = "${buildDir}/db/sports"
+}
+
+task createSports2000Db(type: CreateDB){
+	dbName = 'sports2000'
+  sourceDb = "${dlcHome}/sports2000"
+	outputDir = "${buildDir}/db/sports2000"
+}
+
+task createSports2020Db(type: CreateDB){
+	dbName = 'sports2020'
+  sourceDb = "${dlcHome}/sports2020"
+	outputDir = "${buildDir}/db/sports2020"
+}
+
+task copyDefaultDatabases(){
+  dependsOn 'createEmptyDb','createSportsDb','createSports2000Db','createSports2020Db'
+}
+
+/*We need to run this .p so that it creates a .json containing
+all the base files we want to copy over when we generate the code. */
+task preCompile(type: ABLRun) {
+  procedure = "src/Build/BuildBaseFilesTempTable.p"
+  propath("src")
+  arguments = ["parameter": "Build"]
+}
+/* When compiling we need to be connected to a database so that we have
+access to the VST tables. We then use aliases (i.e. Db._File) at runtime 
+to rotate through all the databases we are connected to.*/
+tasks.withType(ABLCompile) {
+  dependsOn copyDefaultDatabases 
+  dependsOn preCompile
+  dbConnection {
+    dbName = "${buildDir}/db/empty/empty.db"
+    id = "empty"
+    connectionParameters = "-1"
+    aliases = ["Db"]
+  }
+
+  exclude('**/custom/**')
+  exclude('**/build/**')
+  exclude('**/rcode/**')
+  exclude('**/scripts/**')
+
+  exclude('**/src/Build/**')
+  exclude('**/Templates/BaseFiles/**')
+}
+
+/* Create PL (package) */
+task createPL(type: PL){
+	plFile = "${buildDir}/dist/onetwothree.pl"
+	from("${buildDir}/rcode")
+	include('**/*.r')
+	arguments = [encoding  : 'undefined' ]
+}
+createPL.dependsOn 'compileAbl'
+
+/* Move the created .pl to the scripts dir since the python
+script will be using it from there. */
+task postCompile(type: Copy) {
+  from("${buildDir}/dist")
+  into "scripts"
+  include "*.pl"
+}
+
+
+postCompile.dependsOn 'createPL'
+
+build.finalizedBy postCompile

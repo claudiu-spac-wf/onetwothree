@@ -1,0 +1,15 @@
+**/.gradle/**
+**/.settings/**
+
+**/build/**
+**/rcode/**
+
+**/.dbconnection
+
+**/scripts/onetwothree.ini
+**/scripts/db_conn.pf
+**/scripts/onetwothree.pl
+**/scripts/*.json
+
+**/gen/**
+**/**/gen/**
